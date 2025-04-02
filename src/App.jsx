@@ -15,6 +15,7 @@ function CV() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showButtons, setShowButtons] = useState(true);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -27,9 +28,72 @@ function CV() {
 
   const toggleChat = () => {
     setIsChatOpen(prevState => !prevState);
+
+    if (!isChatOpen) {
+      setShowButtons(true);
+    }
     console.log("Chat estado:", !isChatOpen); 
   };
-
+  
+  const handleButtonClick = (query) => {
+    const userMessage = { text: query, sender: 'user' };
+    setMessages(prev => [...prev, userMessage]);
+    processUserMessage(query);
+    setShowButtons(false);
+  };
+  
+  const processUserMessage = (message) => {
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      const userQuestion = message.toLowerCase();
+      
+      const responseMap=[
+        {
+          keywords: ["hola", "saludos"],
+          response: "Hola, soy el asistente virtual de Bryan. ¿En qué puedo ayudarte?"
+        },
+        {
+          keywords: ["experiencia", "trabajo"],
+          response: "Bryan ha trabajado como becario en PLAi y tiene varios proyectos personales."
+        },
+        {
+          keywords: ["contacto", "email", "correo", "teléfono"],
+          response: "Puedes contactar a Bryan Omar Mayoral Gonzalez por email en brmayoralg@gmail.com o por teléfono al +33 1537 3501."
+        },
+        {
+          keywords: ["habilidades", "tecnologías", "lenguajes"],
+          response: "Las habilidades de Bryan incluyen HTML, CSS, JavaScript, Python y Java."
+        },
+        {
+          keywords: ["java"],
+          response: "Bryan es un semiexperto en Java con experiencia en desarrollo de aplicaciones."
+        }
+      ];
+      
+      let response = "Lo siento, no entendí tu pregunta. ¿Puedes ser más específico?";
+      for (const item of responseMap) {
+        if (item.keywords.some(keyword => userQuestion.includes(keyword))) {
+          response = item.response;
+          break;
+        }
+      }
+      
+      const botMessage = { 
+        text: response, 
+        sender: 'bot',
+        showButtons: response.includes("no entendí")
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+      
+      if (response.includes("no entendí")) {
+        setShowButtons(true);
+      }
+      
+      setIsLoading(false);
+    }, 1000);
+  };
   
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -38,58 +102,16 @@ function CV() {
     
     const userMessage = { text: input, sender: 'user' };
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
     
-    try {
-      setTimeout(() => {
-        const userQuestion = userMessage.text.toLowerCase();
-        
-                
-        const responseMap = [
-          {
-            keywords: ["hola", "saludos"],
-            response: "Hola, soy el asistente virtual de Bryan. ¿En qué puedo ayudarte?"
-          },
-          {
-            keywords: ["experiencia", "trabajo"],
-            response: "Bryan ha trabajado como becario en PLAi y tiene varios proyectos personales."
-          },
-          {
-            keywords: ["contacto", "email", "correo", "teléfono"],
-            response: "Puedes contactar a Bryan por email en brmayoralg@gmail.com o por teléfono al +33 1537 3501."
-          },
-          {
-            keywords: ["habilidades", "tecnologías", "lenguajes"],
-            response: "Las habilidades de Bryan incluyen HTML, CSS, JavaScript, Python y Java."
-          },
-          {
-            keywords: ["java"],
-            response: "Bryan es un semiexperto en Java con experiencia en desarrollo de aplicaciones."
-          }
-        ];
-        
-        // Buscar coincidencia en el mapa
-        let response = "Lo siento, no entendí tu pregunta. ¿Puedes ser más específico?";
-        for (const item of responseMap) {
-          if (item.keywords.some(keyword => userQuestion.includes(keyword))) {
-            response = item.response;
-            break;
-          }
-        }
-        
-        const botMessage = { 
-          text: response, 
-          sender: 'bot' 
-        };
-        setMessages(prev => [...prev, botMessage]);
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Error al enviar mensaje:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    processUserMessage(input);
+    
+    setInput('');
+    setShowButtons(false);
+  };
+
+  const resetChat = () => {
+    setMessages([]);
+    setShowButtons(true);
   };
 
   return (
@@ -151,11 +173,18 @@ function CV() {
         <div className="fixed bottom-24 right-6 w-80 h-96 bg-white rounded-lg shadow-xl overflow-hidden flex flex-col z-40">
           <div className="bg-blue-600 text-white p-3 flex justify-between items-center">
             <h3 className="font-medium">ChatBot</h3>
-            <button onClick={toggleChat} className="text-white hover:text-gray-200">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex gap-2">
+              <button onClick={resetChat} className="text-white hover:text-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <button onClick={toggleChat} className="text-white hover:text-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 p-3 overflow-y-auto bg-gray-100">
@@ -185,6 +214,22 @@ function CV() {
                   <span className="h-2 w-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
                   <span className="h-2 w-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
                 </div>
+              </div>
+            )}
+            {showButtons && (
+              <div className="flex flex-col space-y-2 mb-3">
+                <button onClick={() => handleButtonClick("Hola")} className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded-lg text-left transition-colors">
+                  Saludar
+                </button>
+                <button onClick={() => handleButtonClick("contacto")} className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded-lg text-left transition-colors">
+                  Información de contacto
+                </button>
+                <button onClick={() => handleButtonClick("experiencia")} className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded-lg text-left transition-colors">
+                  Experiencia laboral
+                </button>
+                <button onClick={() => handleButtonClick("habilidades")} className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-2 px-4 rounded-lg text-left transition-colors">
+                  Habilidades
+                </button>
               </div>
             )}
             <div ref={messagesEndRef} />
