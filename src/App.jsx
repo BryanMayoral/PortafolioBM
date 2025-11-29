@@ -1,10 +1,9 @@
-import ChatBot from './components/Chatbot';
-{/*import Prueba from './components/Prueba';*/}
+import Chatbot from './components/Chatbot';
 
 function App() {
   return (
     <>
-      <ChatBot/>
+      <Chatbot/>
     </>
   );
 }

@@ -10,7 +10,6 @@ function ChatBot() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mainMenuKey, setMainMenuKey] = useState(null);
-
   const messagesEndRef = useRef(null);
   const [txtVolver, setVolver] = useState(["Principal"]);
 
@@ -27,20 +26,31 @@ function ChatBot() {
         setError(null);
 
         const directus = createDirectus('http://localhost:8055').with(rest());
-        const response = await directus.request(readItems('MensajesChatbot'));
+        const response = await directus.request(
+          readItems('Mensajes_Chatbot', {
+            fields: ['*', 'Chatbot.Nombre'],
+            filter: {
+              Chatbot: {
+                Nombre: {
+                  _eq: 'Plai'
+                }
+              }
+            }
+          })
+        );
         const data = response.data || response;
-
         const messageMap = {};
         data.forEach(item => {
           messageMap[item.id] = {
             id: item.id,
-            title: item.titulo,
-            text: item.mensaje,
-            children: item.mensajes || []
+            title: item.Titulo,
+            text: item.Texto_Mensaje,
+            children: item.Mensaje || []
           };
         });
 
         
+
         const processedStructure = {};
         Object.values(messageMap).forEach(item => {
           const buttons = item.children.map(childId => messageMap[childId]?.title).filter(Boolean);
@@ -50,8 +60,9 @@ function ChatBot() {
           };
         });
 
-        const rootItem = data.find(item => item.parent_message_id === null);
-        const rootTitle = rootItem?.titulo || "Principal";
+        const rootItem = data.find(item => item.Mensaje_Padre === null);
+        rootTitle = rootItem.Titulo;
+        setVolver([rootTitle]);
 
         setContentStructure(processedStructure);
         setMainMenuKey(rootTitle);
@@ -60,7 +71,7 @@ function ChatBot() {
           { from: 'bot', text: '¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?' }
         ];
 
-        if(processedStructure[rootTitle]?.buttons) {
+        if (processedStructure[rootTitle]?.buttons) {
           initialMessages.push({
             from: 'bot',
             type: 'buttons',
@@ -111,6 +122,33 @@ function ChatBot() {
     }, 800);
   };
 
+  const handleBack = () => {
+    if (txtVolver.length <= 1) return;
+
+    const previousHistory = [...txtVolver];
+    previousHistory.pop(); // quitar actual
+    const previousTitle = previousHistory[previousHistory.length - 1];
+    setVolver(previousHistory);
+
+    const content = contentStructure[previousTitle];
+    if (!content || !content.text) return;
+
+    const newMessages = [
+      { from: 'bot', text: content.text }
+    ];
+
+    if (content.buttons && content.buttons.length > 0) {
+      newMessages.push({
+        from: 'bot',
+        type: 'buttons',
+        category: previousTitle,
+        buttons: content.buttons
+      });
+    }
+
+    setMessages(prev => [...prev, ...newMessages]);
+  };
+
   const resetToMainMenu = () => {
     if (!mainMenuKey || !contentStructure[mainMenuKey]) return;
 
@@ -123,7 +161,7 @@ function ChatBot() {
         buttons: contentStructure[mainMenuKey].buttons
       }
     ]);
-    setVolver(["Principal"]);
+    setVolver([mainMenuKey]);
   };
 
   const toggleChat = () => {
@@ -237,6 +275,15 @@ function ChatBot() {
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {txtVolver.length > 1 &&(
+          <button
+            onClick={handleBack}
+            className="bg-blue-500 text-white px-3 py-1 m-2 rounded text-sm hover:bg-blue-600 transition whitespace-nowrap self-start"
+          >
+            ← Volver
+          </button>
+        )}
       </div>
     </>
   );
