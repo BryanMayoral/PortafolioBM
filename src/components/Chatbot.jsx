@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bot, MessageSquare, X, ArrowLeftCircle, Loader } from 'lucide-react';
-import { createDirectus, rest, readItems } from '@directus/sdk';
+import { MessageSquare, X, ArrowLeftCircle, Loader } from 'lucide-react';
+import { createDirectus, rest, readItems, staticToken } from '@directus/sdk';
 
 function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +12,59 @@ function ChatBot() {
   const [mainMenuKey, setMainMenuKey] = useState(null);
   const messagesEndRef = useRef(null);
   const [txtVolver, setVolver] = useState(["Principal"]);
+
+  // Función para limpiar HTML manteniendo formato básico del WYSIWYG
+  const cleanHTML = (html) => {
+    if (!html) return '';
+    
+    // Crear un elemento temporal para parsear el HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Etiquetas permitidas del editor WYSIWYG
+    const allowedTags = [
+      'P', 'SPAN', 'DIV',           // Contenedores
+      'STRONG', 'B',                 // Negrita
+      'EM', 'I',                     // Cursiva
+      'U',                           // Subrayado
+      'S', 'STRIKE', 'DEL',         // Tachado
+      'SUB',                         // Subíndice (X₂)
+      'SUP',                         // Superíndice (X²)
+      'H1', 'H2', 'H3',             // Encabezados
+      'UL', 'OL', 'LI',             // Listas
+      'BLOCKQUOTE',                  // Citas
+      'A',                           // Enlaces
+      'BR'                           // Saltos de línea
+    ];
+    
+    // Remover etiquetas no permitidas
+    temp.querySelectorAll('*').forEach(el => {
+      if (!allowedTags.includes(el.tagName)) {
+        // Reemplazar la etiqueta por su contenido
+        el.replaceWith(...el.childNodes);
+      } else {
+        // Remover atributos de estilo inline
+        el.removeAttribute('style');
+        
+        // Solo mantener href para enlaces
+        if (el.tagName !== 'A') {
+          Array.from(el.attributes).forEach(attr => {
+            el.removeAttribute(attr.name);
+          });
+        } else {
+          // Para enlaces, solo mantener href y target
+          Array.from(el.attributes).forEach(attr => {
+            if (!['href', 'target'].includes(attr.name)) {
+              el.removeAttribute(attr.name);
+            }
+          });
+        }
+      }
+    });
+    
+    // Obtener el HTML limpio
+    return temp.innerHTML.trim();
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -25,7 +78,7 @@ function ChatBot() {
         setLoading(true);
         setError(null);
 
-        const directus = createDirectus('http://localhost:8055').with(rest());
+        const directus = createDirectus(import.meta.env.VITE_DIRECTUS_URL).with(rest()).with(staticToken(import.meta.env.VITE_DIRECTUS_TOKEN));
         const response = await directus.request(
           readItems('Mensajes_Chatbot', {
             fields: ['*', 'Chatbot.Nombre'],
@@ -39,17 +92,17 @@ function ChatBot() {
           })
         );
         const data = response.data || response;
+        console.log(data);
         const messageMap = {};
         data.forEach(item => {
           messageMap[item.id] = {
             id: item.id,
             title: item.Titulo,
-            text: item.Texto_Mensaje,
-            children: item.Mensaje || []
+            // Limpiar el HTML del texto del mensaje
+            text: cleanHTML(item.Texto_Mensaje),
+            children: item.Mensajes || []
           };
         });
-
-        
 
         const processedStructure = {};
         Object.values(messageMap).forEach(item => {
@@ -60,8 +113,8 @@ function ChatBot() {
           };
         });
 
-        const rootItem = data.find(item => item.Mensaje_Padre === null);
-        rootTitle = rootItem.Titulo;
+        const rootItem = data.find(item => item.Mensaje_padre === null);
+        const rootTitle = rootItem.Titulo;
         setVolver([rootTitle]);
 
         setContentStructure(processedStructure);
@@ -126,7 +179,7 @@ function ChatBot() {
     if (txtVolver.length <= 1) return;
 
     const previousHistory = [...txtVolver];
-    previousHistory.pop(); // quitar actual
+    previousHistory.pop();
     const previousTitle = previousHistory[previousHistory.length - 1];
     setVolver(previousHistory);
 
@@ -210,7 +263,7 @@ function ChatBot() {
       >
         <div className="bg-blue-600 text-white p-3 rounded-t-lg flex items-center justify-between">
           <div className="flex items-center">
-            <Bot className="mr-2" />
+            <img src="/plai-removebg-preview.png" className="w-10 h-auto" alt="Logo Plai"/>
             <h2 className="font-bold">Asistente Virtual</h2>
           </div>
           <div className="flex space-x-2">
@@ -253,11 +306,10 @@ function ChatBot() {
                   {renderButtons(msg.buttons, msg.category)}
                 </div>
               ) : (
-                <div className={`px-3 py-2 rounded max-w-[80%] text-sm ${msg.from === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
-                  {msg.text.split('\n').map((paragraph, i) => (
-                    <p key={i} className={i > 0 ? 'mt-2' : ''}>{paragraph}</p>
-                  ))}
-                </div>
+                <div 
+                  className={`px-3 py-2 rounded max-w-[80%] text-sm ${msg.from === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'} [&_ul]:list-disc [&_ul]:ml-4 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:ml-4 [&_ol]:my-2 [&_li]:ml-2 [&_p]:my-1 [&_a]:underline [&_a]:break-all hover:[&_a]:opacity-80`}
+                  dangerouslySetInnerHTML={{ __html: msg.text }}
+                />
               )}
             </div>
           ))}
@@ -276,7 +328,7 @@ function ChatBot() {
           <div ref={messagesEndRef} />
         </div>
 
-        {txtVolver.length > 1 &&(
+        {txtVolver.length > 1 && (
           <button
             onClick={handleBack}
             className="bg-blue-500 text-white px-3 py-1 m-2 rounded text-sm hover:bg-blue-600 transition whitespace-nowrap self-start"
